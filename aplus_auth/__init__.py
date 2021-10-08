@@ -30,10 +30,12 @@ def _not_none_getter(name: str):
 class _SettingsBase:
     _PUBLIC_KEY: Optional[str] = field(default=None, repr=False)
     _PRIVATE_KEY: Optional[str] = field(default=None, repr=False)
+    _AUTH_CLASS: Optional[Type[ServiceAuthentication[Any]]] = field(default=None, repr=False)
     _REMOTE_AUTHENTICATOR_URL: Optional[str] = field(default=None, repr=False)
     _REMOTE_AUTHENTICATOR_KEY: Optional[str]  = field(default=None, repr=False)
     _TRUSTING_REMOTES: List[str] = field(default_factory=list, repr=False)
     _TRUSTED_KEYS: List[str] = field(default_factory=list, repr=False)
+    DISABLE_LOGIN_CHECKS: bool = False
     DISABLE_JWT_SIGNING: bool = False
 
 
@@ -43,12 +45,18 @@ class Settings(_SettingsBase):
     """
     PUBLIC_KEY: str = _not_none_getter("_PUBLIC_KEY") # type: ignore
     PRIVATE_KEY: str = _not_none_getter("_PRIVATE_KEY") # type: ignore
+    AUTH_CLASS: Type[ServiceAuthentication[Any]] = _not_none_getter("_AUTH_CLASS") # type: ignore
     REMOTE_AUTHENTICATOR_URL: str = _not_none_getter("_REMOTE_AUTHENTICATOR_URL") # type: ignore
     REMOTE_AUTHENTICATOR_KEY: str = _not_none_getter("_REMOTE_AUTHENTICATOR_KEY") # type: ignore
     TRUSTING_REMOTES: List[str] = _not_none_getter("_TRUSTING_REMOTES") # type: ignore
     TRUSTED_KEYS: List[str] = _not_none_getter("_TRUSTED_KEYS") # type: ignore
 
     def __init__(self, **kwargs: Any) -> None:
+        if kwargs.get("AUTH_CLASS") is not None:
+            module_name, cls_name = kwargs["AUTH_CLASS"].rsplit(".", 1)
+            module = __import__(module_name, fromlist=[cls_name])
+            kwargs["AUTH_CLASS"] = getattr(module, cls_name)
+
         if "TRUSTING_REMOTES" not in kwargs and kwargs.get("REMOTE_AUTHENTICATOR_URL") is not None:
             kwargs["TRUSTING_REMOTES"] = [urlparse(kwargs["REMOTE_AUTHENTICATOR_URL"]).netloc]
 
@@ -56,7 +64,7 @@ class Settings(_SettingsBase):
             kwargs["TRUSTED_KEYS"] = [kwargs["REMOTE_AUTHENTICATOR_KEY"]]
 
         kwargs = {
-            ("" if k in ("DISABLE_JWT_SIGNING") else "_") + k: v
+            ("" if k in ("DISABLE_LOGIN_CHECKS", "DISABLE_JWT_SIGNING") else "_") + k: v
             for k,v in kwargs.items()
         }
         super().__init__(**kwargs)
