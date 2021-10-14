@@ -1,8 +1,15 @@
 from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
-from typing import Any, List, Optional, TYPE_CHECKING, Type
+from typing import Any, List, Optional, TYPE_CHECKING, Type, Union
 from urllib.parse import urlparse
+
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
+from cryptography.hazmat.primitives.serialization import (
+    load_pem_private_key,
+    load_ssh_private_key,
+)
+from jwt.algorithms import get_default_algorithms
 
 from aplus_auth.exceptions import NotDefinedError
 
@@ -26,10 +33,28 @@ def _not_none_getter(name: str):
     return wrapper
 
 
+def _load_private_key(key: Union[str, bytes]) -> RSAPrivateKey:
+    if isinstance(key, str):
+        key = key.encode("utf-8")
+
+    try:
+        pkey = load_pem_private_key(key, password=None)
+    except ValueError:
+        try:
+            pkey = load_ssh_private_key(key, password=None)
+        except ValueError as e:
+            raise ValueError("Private key in wrong format") from e
+
+    if not isinstance(pkey, RSAPrivateKey):
+        raise ValueError("Private key is not RSA")
+
+    return pkey
+
+
 @dataclass
 class _SettingsBase:
     _PUBLIC_KEY: Optional[str] = field(default=None, repr=False)
-    _PRIVATE_KEY: Optional[str] = field(default=None, repr=False)
+    _PRIVATE_KEY: Optional[RSAPrivateKey] = field(default=None, repr=False)
     _AUTH_CLASS: Optional[Type[ServiceAuthentication[Any]]] = field(default=None, repr=False)
     _REMOTE_AUTHENTICATOR_URL: Optional[str] = field(default=None, repr=False)
     _REMOTE_AUTHENTICATOR_KEY: Optional[str]  = field(default=None, repr=False)
@@ -44,7 +69,7 @@ class Settings(_SettingsBase):
     Library settings.
     """
     PUBLIC_KEY: str = _not_none_getter("_PUBLIC_KEY") # type: ignore
-    PRIVATE_KEY: str = _not_none_getter("_PRIVATE_KEY") # type: ignore
+    PRIVATE_KEY: RSAPrivateKey = _not_none_getter("_PRIVATE_KEY") # type: ignore
     AUTH_CLASS: Type[ServiceAuthentication[Any]] = _not_none_getter("_AUTH_CLASS") # type: ignore
     REMOTE_AUTHENTICATOR_URL: str = _not_none_getter("_REMOTE_AUTHENTICATOR_URL") # type: ignore
     REMOTE_AUTHENTICATOR_KEY: str = _not_none_getter("_REMOTE_AUTHENTICATOR_KEY") # type: ignore
@@ -62,6 +87,11 @@ class Settings(_SettingsBase):
 
         if "TRUSTED_KEYS" not in kwargs and "REMOTE_AUTHENTICATOR_KEY" in kwargs:
             kwargs["TRUSTED_KEYS"] = [kwargs["REMOTE_AUTHENTICATOR_KEY"]]
+
+        if kwargs.get("PRIVATE_KEY") is not None:
+            # pyjwt cannot load an ssh private key, so we do it ourselves
+            # incidentally, this has a small performance benefit
+            kwargs["PRIVATE_KEY"] = _load_private_key(kwargs["PRIVATE_KEY"])
 
         kwargs = {
             ("" if k in ("DISABLE_LOGIN_CHECKS", "DISABLE_JWT_SIGNING") else "_") + k: v
