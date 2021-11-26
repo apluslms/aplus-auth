@@ -163,6 +163,12 @@ class Payload:
             self.exp = exp
         elif isinstance(exp, float):
             self.exp = datetime.utcfromtimestamp(exp)
+        elif isinstance(exp, str):
+            try:
+                time = datetime.strptime(exp, "%H:%M:%S")
+                self.exp = timedelta(hours=time.hour, minutes=time.minute, seconds=time.second)
+            except:
+                self.exp = datetime.fromisoformat(exp)
         else:
             self.exp = None
 
