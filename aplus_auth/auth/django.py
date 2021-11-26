@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import wraps, partial
 import logging
-from typing import Any, Generic, Optional, Tuple, TypeVar, Union
+from typing import Generic, Optional, Tuple, TypeVar, Union
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.http import HttpRequest, HttpResponse
@@ -166,45 +166,37 @@ class AuthenticationMiddleware:
 class RemoteAuthenticator(View, ABC):
     """
     A base for a remote authentication view. Signs a token for a third-party.
+    Return a string in JSON format.
 
-    You must override has_permission and get_audience.
+    You must override get_audience and implement get.
+
+    get_token can raise ValueError if target audience/url is not specified or
+    cannot be determined.
     """
     expiration_time = timedelta(minutes=1)
-
-    @abstractmethod
-    def has_permission(self, request: Request, payload: Payload) -> Optional[str]:
-        """
-        Check whether id has access to whatever token is asking for.
-        Return None on success, otherwise the reason for failure.
-        """
 
     @abstractmethod
     def get_audience(self, alias: str) -> str:
         """Get public key corresponding to alias"""
 
-    def get(self, request: Request, **kwargs: Any):
-        if not isinstance(request.auth, Payload):
-            return HttpResponse("Missing auth token", status=500)
+    def get_expiration_time(self, request: Request, payload: Payload) -> Union[datetime, timedelta]:
+        return self.expiration_time
 
-        if "taud" in request.auth.extra:
-            request.auth.aud = request.auth.extra["taud"]
-        elif "turl" in request.auth.extra:
+    def get_token(self, request: Request, payload: Payload) -> str:
+        if "taud" in payload.extra:
+            payload.aud = payload.extra["taud"]
+        elif "turl" in payload.extra:
             try:
-                request.auth.aud = self.get_audience(request.auth.extra["turl"])
+                payload.aud = self.get_audience(payload.extra["turl"])
             except:
-                return HttpResponse("Failed to get audience for url", status=400)
+                raise ValueError("Failed to get audience for url")
         else:
-            return HttpResponse("No target audience key in payload", status=400)
+            raise ValueError("No target audience key in payload")
 
-        request.auth.extra.pop("taud", None)
-        request.auth.extra.pop("turl", None)
-
-        reason = self.has_permission(request, request.auth)
-        if reason is None:
-            request.auth.sub = request.auth.iss
-            request.auth.iss = None
-            request.auth.exp = self.expiration_time
-            token = jwt_sign(request.auth)
-            return HttpResponse(token)
-        else:
-            return HttpResponse(status=403)
+        payload.extra.pop("taud", None)
+        payload.extra.pop("turl", None)
+        payload.sub = payload.iss
+        payload.iss = None
+        payload.exp = self.get_expiration_time(request, payload)
+        token = jwt_sign(payload)
+        return token
