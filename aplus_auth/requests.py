@@ -1,4 +1,6 @@
 from __future__ import annotations
+import json
+from json.decoder import JSONDecodeError
 import logging
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, TypeVar, Union
 from urllib.parse import urlparse
@@ -67,7 +69,15 @@ else:
         if response.status_code != 200:
             logger.warn(f"Remote authentication from {remote_url} returned {response.status_code}: {response.text}")
             raise RemoteTokenError("Failed to get token from remote")
-        return response.text
+
+        try:
+            token = json.loads(response.text)
+        except JSONDecodeError as e:
+            raise RemoteTokenError(f"Remote responded with invalid json: {e}")
+
+        if not isinstance(token, str):
+            raise RemoteTokenError(f"Remote responded with a non-string json: {token}")
+        return token
 
 
     def _only_one(items) -> None:
