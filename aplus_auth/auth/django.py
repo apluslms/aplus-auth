@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from functools import wraps, partial
 import logging
 from typing import Generic, Optional, Tuple, TypeVar, Union
+import urllib.parse
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.http import HttpRequest, HttpResponse
@@ -55,7 +56,8 @@ def login_required(func=None, *, redirect_url = None, status = 401):
             if redirect_url is None:
                 return HttpResponse(status=status)
             else:
-                return HttpResponseRedirect(redirect_url.format(url=request.path))
+                url = redirect_url.format(url=urllib.parse.quote_plus(request.path))
+                return HttpResponseRedirect(url)
         return func(request, *args, **kwargs)
     return wrapper
 
