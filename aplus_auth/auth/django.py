@@ -146,7 +146,9 @@ class AuthenticationMiddleware:
             try:
                 user_token = auth_obj.authenticate(request)
             except AuthenticationFailed as e:
-                return HttpResponse(str(e), status=401)
+                response = HttpResponse(str(e), status=401)
+                self.set_token(request, response, None)
+                return response
 
             if user_token is not None:
                 request.user = user_token[0]
