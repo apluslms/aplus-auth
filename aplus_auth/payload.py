@@ -155,6 +155,9 @@ class Payload:
             tokens: Optional[List[str]] = None,
             **kwargs: Any,
             ) -> None:
+        """
+        May raise ValueError on invalid dates.
+        """
 
         self.iss = iss
         self.sub = sub
@@ -167,8 +170,14 @@ class Payload:
             try:
                 time = datetime.strptime(exp, "%H:%M:%S")
                 self.exp = timedelta(hours=time.hour, minutes=time.minute, seconds=time.second)
-            except:
-                self.exp = datetime.fromisoformat(exp)
+            except ValueError:
+                try:
+                    self.exp = datetime.fromisoformat(exp)
+                except ValueError:
+                    raise ValueError(
+                        "Expiry time must be in either 'HH:MM:SS' or "
+                        "'YYYY-MM-DD[*HH[:MM[:SS[.fff[fff]]]][+HH:MM[:SS[.ffffff]]]]' format"
+                    )
         else:
             self.exp = None
 
