@@ -151,13 +151,15 @@ class Payload:
             sub: Optional[str] = None,
             aud: Optional[str] = None,
             exp: Optional[Union[timedelta, datetime, float]] = None,
-            permissions: Union[Permissions, List[PermissionSpec]] = Permissions(),
+            permissions: Union[Permissions, List[PermissionSpec]] = None,
             tokens: Optional[List[str]] = None,
             **kwargs: Any,
             ) -> None:
         """
         May raise ValueError on invalid dates.
         """
+        if permissions is None:
+            permissions = Permissions()
 
         self.iss = iss
         self.sub = sub
