@@ -23,6 +23,9 @@ Possible settings:
     <setting key>, <default>
         <explanation>
 
+    UID,
+        The unique identifier of the service.
+        Always required.
     PUBLIC_KEY, None
         A string containing the public key (RSA)
         Required if JWT requests or authentication is used
@@ -32,21 +35,38 @@ Possible settings:
     AUTH_CLASS, None
         The dotted path to a authentication class to be used by the authentication middleware
         Required only if the library's authentication middleware is used
+    REMOTE_AUTHENTICATOR_UID, None
+        UID of the service that check permissions and signs tokens with a trusted key (A+).
+        Required for non-A+ services connecting to other services. More precisely,
+        it is required if JWT requests are used, the target services do not trust UID and
+        the Request class isn't overridden to use a different token.
     REMOTE_AUTHENTICATOR_URL, None
         URL of the service that check permissions and signs tokens with a trusted key (A+).
-        Required for non A+ services connecting to other services. More precisely,
-        it is required if JWT requests are used, the target services do not trust PUBLIC_KEY and
-        the Request class isn't overridden to use a different token.
+        Required if REMOTE_AUTHENTICATOR_UID is required.
     REMOTE_AUTHENTICATOR_KEY, None
         The public key of the remote authentication service.
-        Required if REMOTE_AUTHENTICATOR_URL is required.
-    TRUSTING_REMOTES, [<netloc of REMOTE_AUTHENTICATOR_URL>]
-        netlocs of the services that do not require a remotely authenticated JWT.
+        Required if REMOTE_AUTHENTICATOR_UID is required.
+    UID_TO_KEY, {}*
+        A mapping of service UIDs to their public keys. Used for determining
+        whether a JWT was signed using the correct private key.
+        *The following are also added if they are not specified and the UID and
+        key are not None in the settings:
+            <UID>: <PUBLIC_KEY>
+            <REMOTE_AUTHENTICATOR_UID>: <REMOTE_AUTHENTICATOR_KEY>
+    TRUSTING_REMOTES, {<netloc of REMOTE_AUTHENTICATOR_URL>: <REMOTE_AUTHENTICATOR_UID>}
+        A mapping of URLs to the UIDs of the services that do not require a remotely signed JWT.
+        That is, the services that have UID in their TRUSTED_UIDS. The URL can contain the scheme
+        (optional), netloc of the service and a path (optional). E.g. http://example.com/example/path where
+        http:// and /example/path are optional. The scheme and netloc must be lowercase.
         This makes it possible to skip the remote token signing.
-    TRUSTED_KEYS, [<REMOTE_AUTHENTICATOR_KEY>]
-        Issuer (public) keys in JWT tokens that are trusted. This means that any JWT signed with
-        the private counterpart of any of these keys is trusted to be correct. The service's own
-        public key is always trusted even without it being in this list.
+    DEFAULT_AUD_UID, None
+        The default UID if the request URL isn't found in TRUSTING_REMOTES.
+        Meant to be used if all services trust this service, e.g. A+ itself.
+    TRUSTED_UIDS, [<REMOTE_AUTHENTICATOR_UID>]
+        Issuer UIDs in JWT tokens that are trusted. This means that any JWT signed with
+        the private key of a service with its UID in the list is trusted to be correct.
+        The key corresponding to an UID is determined through UID_TO_KEY.
+        The service's own public key is always trusted even without it being in this list.
     DISABLE_LOGIN_CHECKS, False*
         Skips login check in the login_required decorator if True. Should be False in production.
         * If used as a django app, this defaults to the DEBUG value in django settings

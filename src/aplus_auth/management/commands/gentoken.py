@@ -65,7 +65,7 @@ class Command(BaseCommand):
         payload = Payload(**options)
 
         if payload.aud is None:
-            payload.aud = settings().PUBLIC_KEY
+            payload.aud = settings().UID
 
         self.stdout.write("Payload:\n")
         self.stdout.write(pformat(payload) + "\n\n")

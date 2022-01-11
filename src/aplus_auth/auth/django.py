@@ -87,9 +87,10 @@ class ServiceAuthentication(ABC, Generic[_UserType]):
         if payload.sub is None:
             payload.sub = payload.iss
 
-        if not settings().DISABLE_LOGIN_CHECKS and (not self.allow_any_issuer
-            and payload.iss != settings().PUBLIC_KEY
-            and payload.iss not in settings().TRUSTED_KEYS
+        if not settings().DISABLE_LOGIN_CHECKS and (
+            not self.allow_any_issuer
+            and payload.iss != settings().UID
+            and payload.iss not in settings().TRUSTED_UIDS
         ):
             raise AuthenticationFailed("Token must be issued by remote authenticator or self")
 
@@ -172,30 +173,40 @@ class RemoteAuthenticator(View, ABC):
     A base for a remote authentication view. Signs a token for a third-party.
     Return a string in JSON format.
 
-    You must override get_audience and implement get.
+    You must implement get(...) yourself.
 
     get_token can raise ValueError if target audience/url is not specified or
     cannot be determined.
     """
     expiration_time = timedelta(minutes=1)
 
-    @abstractmethod
-    def get_audience(self, alias: str) -> str:
-        """Get public key corresponding to alias"""
+    def get_audience(self, url: str) -> str:
+        """
+        Get UID corresponding to an URL.
+
+        Raises ValueError if UID couldn't be found.
+        """
+        uid = settings().get_uid_for_url(url, no_default=True)
+        if uid is None:
+            raise ValueError(f"Failed to get UID for URL {url}")
+
+        return uid
 
     def get_expiration_time(self, request: Request, payload: Payload) -> Union[datetime, timedelta]:
         return self.expiration_time
 
     def get_token(self, request: Request, payload: Payload) -> str:
+        """
+        Return a JWT token given the payload received from a request.
+
+        Raises ValueError if target aud(ience) cannot be resolved.
+        """
         if "taud" in payload.extra:
             payload.aud = payload.extra["taud"]
         elif "turl" in payload.extra:
-            try:
-                payload.aud = self.get_audience(payload.extra["turl"])
-            except:
-                raise ValueError("Failed to get audience for url")
+            payload.aud = self.get_audience(payload.extra["turl"])
         else:
-            raise ValueError("No target audience key in payload")
+            raise ValueError("No target audience in payload")
 
         payload.extra.pop("taud", None)
         payload.extra.pop("turl", None)

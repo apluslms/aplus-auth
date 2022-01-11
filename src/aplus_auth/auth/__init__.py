@@ -49,15 +49,20 @@ def verify(token: Optional[str], exception_cls: Type[Exception] = Authentication
     if data is None:
         return None
     if "iss" not in data:
-        logger.warn(f"Authorization token is missing 'iss' field")
+        logger.debug(f"Authorization token is missing 'iss' field")
         return None
+
+    issuer_key = settings().get_key_for_uid(data["iss"])
+    if issuer_key is None:
+        logger.warn(f"Unknown issuer: {data['iss']}")
+        raise exception_cls("Unknown issuer")
 
     # verify
     try:
         payload: Dict[str, Any] = jwt.decode(
             token,
-            data["iss"],
-            audience=settings().PUBLIC_KEY,
+            issuer_key,
+            audience=settings().UID,
             algorithms=["RS256"],
             options={"require": ["iss", "sub", "aud"]}
         )

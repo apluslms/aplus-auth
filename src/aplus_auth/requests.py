@@ -24,7 +24,7 @@ def jwt_sign(payload: Payload) -> str:
 
     iss must not be specified.
     """
-    return jwt.encode({"iss": settings().PUBLIC_KEY, **payload.to_dict()}, settings().PRIVATE_KEY, algorithm="RS256")
+    return jwt.encode({"iss": settings().UID, **payload.to_dict()}, settings().PRIVATE_KEY, algorithm="RS256")
 
 def jwt_no_signature(payload: Payload) -> str:
     """
@@ -59,7 +59,7 @@ else:
         if "taud" not in payload.extra and "turl" not in payload.extra:
             payload.extra["taud"] = payload.aud
 
-        payload.aud = settings().REMOTE_AUTHENTICATOR_KEY
+        payload.aud = None
 
         remote_url = settings().REMOTE_AUTHENTICATOR_URL
         with Session() as session:
@@ -138,12 +138,12 @@ else:
             Gets a token from remote if url doesn't trust us. Otherwise signs the token with own private key.
             """
             if payload.aud is None:
-                payload.aud = settings().REMOTE_AUTHENTICATOR_KEY
+                payload.aud = settings().get_uid_for_url(url)
 
             if payload.sub is None:
-                payload.sub = settings().PUBLIC_KEY
+                payload.sub = settings().UID
 
-            if url != settings().REMOTE_AUTHENTICATOR_URL and urlparse(url).netloc not in settings().TRUSTING_REMOTES:
+            if url != settings()._REMOTE_AUTHENTICATOR_URL and payload.aud is None:
                 payload.extra["turl"] = url
                 return get_token_from_remote(payload)
             else:
