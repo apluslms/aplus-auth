@@ -55,31 +55,6 @@ else:
     )
 
 
-    def get_token_from_remote(payload: Payload, max_retries=default_token_retries) -> str:
-        if "taud" not in payload.extra and "turl" not in payload.extra:
-            payload.extra["taud"] = payload.aud
-
-        payload.aud = None
-
-        remote_url = settings().REMOTE_AUTHENTICATOR_URL
-        with Session() as session:
-            session.mount(remote_url, HTTPAdapter(max_retries=max_retries))
-            response = session.get(remote_url, payload=payload)
-
-        if response.status_code != 200:
-            logger.warn(f"Remote authentication from {remote_url} returned {response.status_code}: {response.text}")
-            raise RemoteTokenError("Failed to get token from remote")
-
-        try:
-            token = json.loads(response.text)
-        except JSONDecodeError as e:
-            raise RemoteTokenError(f"Remote responded with invalid json: {e}")
-
-        if not isinstance(token, str):
-            raise RemoteTokenError(f"Remote responded with a non-string json: {token}")
-        return token
-
-
     def _only_one(items) -> None:
         if sum((val is not None for val in items)) > 1:
             raise ValueError("Only one of permissions, token or payload can be present at the same time")
@@ -133,6 +108,31 @@ else:
             return payload
 
         @classmethod
+        def get_token_from_remote(cls, payload: Payload, max_retries=default_token_retries) -> str:
+            if "taud" not in payload.extra and "turl" not in payload.extra:
+                payload.extra["taud"] = payload.aud
+
+            payload.aud = None
+
+            remote_url = settings().REMOTE_AUTHENTICATOR_URL
+            with Session() as session:
+                session.mount(remote_url, HTTPAdapter(max_retries=max_retries))
+                response = session.get(remote_url, payload=payload)
+
+            if response.status_code != 200:
+                logger.warn(f"Remote authentication from {remote_url} returned {response.status_code}: {response.text}")
+                raise RemoteTokenError("Failed to get token from remote")
+
+            try:
+                token = json.loads(response.text)
+            except JSONDecodeError as e:
+                raise RemoteTokenError(f"Remote responded with invalid json: {e}")
+
+            if not isinstance(token, str):
+                raise RemoteTokenError(f"Remote responded with a non-string json: {token}")
+            return token
+
+        @classmethod
         def get_token(cls, url: str, payload: Payload) -> str:
             """
             Gets a token from remote if url doesn't trust us. Otherwise signs the token with own private key.
@@ -145,7 +145,7 @@ else:
 
             if url != settings()._REMOTE_AUTHENTICATOR_URL and payload.aud is None:
                 payload.extra["turl"] = url
-                return get_token_from_remote(payload)
+                return cls.get_token_from_remote(payload)
             else:
                 return jwt_sign(payload)
 
