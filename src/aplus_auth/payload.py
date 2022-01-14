@@ -1,6 +1,7 @@
 from __future__ import annotations
 from copy import deepcopy
 from datetime import datetime, timedelta
+import json
 from typing import Any, Dict, Generator, Iterator, List, Optional, Tuple, Union
 
 
@@ -67,6 +68,12 @@ class PermissionItemList:
     def __contains__(self, item: Tuple[Permission, Dict[str,Any]]) -> bool:
         return self.has(item[0], **item[1])
 
+    def __str__(self) -> str:
+        return json.dumps(list(self))
+
+    def __repr__(self) -> str:
+        return f"PermissionItemList(type={self.type}, items={self.items})"
+
 
 class Permissions:
     """
@@ -123,6 +130,15 @@ class Permissions:
             **kwargs: Any,
             ) -> Union[Tuple[None, None], PermissionItem]:
         return self.get_list(type).get(permission, **kwargs)
+
+    def __str__(self) -> str:
+        return json.dumps(list(self))
+
+    def __repr__(self) -> str:
+        return (
+            f"Permissions(courses={self.courses}, instances={self.instances}, "
+            f"modules={self.modules}, exercises={self.exercises}, submissions={self.submissions})"
+        )
 
 
 class Payload:
@@ -227,3 +243,18 @@ class Payload:
             out["tokens"] = self.tokens
         out["permissions"] = list(self.permissions)
         return out
+
+    def __str__(self) -> str:
+        out = (
+            f"iss={self.iss}, sub={self.sub}, aud={self.aud}, exp={self.exp}, "
+            f"permissions={self.permissions}, tokens={self.tokens}"
+        )
+        for k,v in self.extra.items():
+            out += f", {k}={v}"
+        return out
+
+    def __repr__(self) -> str:
+        return (
+            f"Payload(iss={self.iss}, sub={self.sub}, aud={self.aud}, exp={self.exp}, "
+            f"permissions={self.permissions}, tokens={self.tokens}, extra={self.extra})"
+        )
