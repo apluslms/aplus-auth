@@ -113,7 +113,7 @@ class Settings(_SettingsBase):
         if kwargs.get("REMOTE_AUTHENTICATOR_UID") is not None:
             if "TRUSTING_REMOTES" not in kwargs and kwargs.get("REMOTE_AUTHENTICATOR_URL") is not None:
                 kwargs["TRUSTING_REMOTES"] = {
-                    urlparse(kwargs["REMOTE_AUTHENTICATOR_URL"]).netloc: kwargs["REMOTE_AUTHENTICATOR_UID"]
+                    urlparse(kwargs["REMOTE_AUTHENTICATOR_URL"]).netloc.lower(): kwargs["REMOTE_AUTHENTICATOR_UID"]
                 }
 
             if "TRUSTED_UIDS" not in kwargs:
@@ -149,15 +149,17 @@ class Settings(_SettingsBase):
         """
         Returns the UID for a given URL, the default from the settings if one isn't found,
         and None if the default is None or no_default = True.
+
+        The URL must have a scheme for the method to work correctly.
         """
         parsed_url = urlparse(url)
         scheme = parsed_url.scheme.lower()
         netloc = parsed_url.netloc.lower()
-        uid = self.TRUSTING_REMOTES.get(f"{scheme}{netloc}{parsed_url.path}")
+        uid = self.TRUSTING_REMOTES.get(f"{scheme}://{netloc}{parsed_url.path}")
         if uid is None:
             uid = self.TRUSTING_REMOTES.get(f"{netloc}{parsed_url.path}")
         if uid is None:
-            uid = self.TRUSTING_REMOTES.get(f"{scheme}{netloc}")
+            uid = self.TRUSTING_REMOTES.get(f"{scheme}://{netloc}")
         if uid is None:
             uid = self.TRUSTING_REMOTES.get(netloc)
         if not no_default and uid is None:
