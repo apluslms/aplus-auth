@@ -57,7 +57,11 @@ Possible settings:
         A mapping of URLs to the UIDs of the services that do not require a remotely signed JWT.
         That is, the services that have UID in their TRUSTED_UIDS. The URL can contain the scheme
         (optional), netloc of the service and a path (optional). E.g. http://example.com/example/path where
-        http:// and /example/path are optional. The scheme and netloc must be lowercase.
+        http:// and /example/path are optional. The scheme and netloc must be lowercase. Note that
+        http://example.com/example/path will match any URL that starts with that: e.g.
+        http://example.com/example/pathmorepath and http://example.com/example/path/more/path will both
+        match it. Use of a trailing / is recommended. If a URL matches multiple keys, the UID with
+        longest key will be taken.
         This makes it possible to skip the remote token signing.
     DEFAULT_AUD_UID, None
         The default UID if the request URL isn't found in TRUSTING_REMOTES.

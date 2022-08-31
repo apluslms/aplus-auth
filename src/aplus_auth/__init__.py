@@ -76,6 +76,19 @@ def _load_public_key(key: Union[str, bytes, RSAPublicKey]) -> RSAPublicKey:
     return pkey
 
 
+def _match_url(path: str, url_to_uid: Optional[Dict[str, str]]) -> Optional[str]:
+    if url_to_uid is None:
+        return None
+
+    uid = None
+    max_length = -1
+    for k,v in url_to_uid.items():
+        if path.startswith(k) and len(k) > max_length:
+            max_length = len(k)
+            uid = v
+    return uid
+
+
 @dataclass
 class _SettingsBase:
     UID: str
@@ -124,7 +137,6 @@ class Settings(_SettingsBase):
                 if kwargs["REMOTE_AUTHENTICATOR_UID"] not in kwargs["UID_TO_KEY"]:
                     kwargs["UID_TO_KEY"][kwargs["REMOTE_AUTHENTICATOR_UID"]] = kwargs["REMOTE_AUTHENTICATOR_KEY"]
 
-
         if kwargs.get("UID") is not None and kwargs.get("PUBLIC_KEY") is not None:
             kwargs.setdefault("UID_TO_KEY", {})
             if kwargs["UID"] not in kwargs["UID_TO_KEY"]:
@@ -155,13 +167,16 @@ class Settings(_SettingsBase):
         parsed_url = urlparse(url)
         scheme = parsed_url.scheme.lower()
         netloc = parsed_url.netloc.lower()
-        uid = self.TRUSTING_REMOTES.get(f"{scheme}://{netloc}{parsed_url.path}")
+        path = parsed_url.path
+        # make sure http://example.com/test matches http://example.com/test/
+        if not path.endswith("/"):
+            path = path + "/"
+
+        uid = _match_url(f"{scheme}://{netloc}{path}", self.TRUSTING_REMOTES)
+
         if uid is None:
-            uid = self.TRUSTING_REMOTES.get(f"{netloc}{parsed_url.path}")
-        if uid is None:
-            uid = self.TRUSTING_REMOTES.get(f"{scheme}://{netloc}")
-        if uid is None:
-            uid = self.TRUSTING_REMOTES.get(netloc)
+            uid = _match_url(f"{netloc}{path}", self.TRUSTING_REMOTES)
+
         if not no_default and uid is None:
             uid = self.DEFAULT_AUD_UID
 
